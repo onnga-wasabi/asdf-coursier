@@ -4,7 +4,8 @@ set -euo pipefail
 
 GH_REPO="https://github.com/coursier/coursier"
 TOOL_NAME="coursier"
-TOOL_TEST="coursier --help"
+TOOL_BIN_NAME="cs"
+TOOL_TEST="${TOOL_BIN_NAME} --help"
 
 fail() {
   echo -e "asdf-$TOOL_NAME: $*"
@@ -55,6 +56,17 @@ get_platform() {
   echo -n $platform
 }
 
+download_jar_release() {
+  local version filename
+  version="$1"
+  filename="$2"
+
+  jar_url="$GH_REPO/releases/download/v${version}/coursier.jar"
+
+  echo "* Downloading $TOOL_NAME jar release $version..."
+  curl "${curl_opts[@]}" "${jar_url}" -o "${filename}" || fail "Could not download ${jar_url}"
+}
+
 download_release() {
   local version filename url
   version="$1"
@@ -69,7 +81,10 @@ download_release() {
     tar -xf "${filename}" || fail "Could not unzip ${filename}"
   else
     url="${url}.gz"
-    curl "${curl_opts[@]}" "${url}" | gzip -d >"${filename}" || fail "Could not download ${url}"
+    if ! curl "${curl_opts[@]}" "${url}" >/dev/null 2>&1 | gzip -d >"${filename}" >/dev/null 2>&1 || exit 1; then
+      echo -e "asdf-$TOOL_NAME: Could not download ${url}, trying with jar release..."
+      download_jar_release ${version} ${filename}
+    fi
   fi
 }
 
@@ -84,7 +99,7 @@ install_version() {
 
   (
     mkdir -p "$install_path/bin"
-    cp -r "$ASDF_DOWNLOAD_PATH/$TOOL_NAME" "$install_path/bin/$TOOL_NAME"
+    cp -r "$ASDF_DOWNLOAD_PATH/$TOOL_NAME" "$install_path/bin/$TOOL_BIN_NAME"
 
     # TODO: Asert coursier executable exists.
     local tool_cmd
